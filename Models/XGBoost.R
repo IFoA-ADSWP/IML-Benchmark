@@ -12,7 +12,8 @@ train_XGBoost = function(dt,
                          tweedie_variance_power = 1.5,
                          use_glm = F,
                          glm_model = NULL,
-                         default_params = T
+                         default_params = T,
+                         nrounds = 1000 # Number of boosting rounds
 ){
   
   # #parameters list
@@ -83,7 +84,7 @@ train_XGBoost = function(dt,
   fit <- xgb.train(
     params = params, 
     data = dtrain, 
-    nrounds = 1000,
+    nrounds = nrounds,
     verbose = 1,
     watchlist = list(validation = vtrain),
     early_stopping_rounds = 10

@@ -4,6 +4,7 @@ source("Models/train_GLM_w_XGB.R")
 source("Models/train_multipl_GLM_XGB.R")
 source("Models/train_GLM_XGBoosted.R")
 source("Models/SAV_GLM.R")
+source("Models/distilltrees.R")
 
 CV = 5
 
@@ -29,6 +30,7 @@ losses = data.frame(CV = paste0("CV_",1:CV),
 # results = fitted$results
 
 for (i in 1:CV){
+
   
   train_rows = which(CV_vec != i)
   
@@ -127,38 +129,38 @@ for (i in 1:CV){
   
   # GLM + XGBoost  -------------------------------------------
   
-  info_helper(n=paste0(iter," Boosted GLM"))
-  
-  models[[iter]]$GLM_XGB_model = train_GLM_XGBoosted(glm_model = models[[iter]]$glm_model,
-                                                     dt = dt_list$fre_mtpl2_freq[train_rows,-c(1,2,3)],
-                                                     y = dt_list$fre_mtpl2_freq$ClaimNb[train_rows],
-                                                     vdt = list(x_val = dt_list$fre_mtpl2_freq[-train_rows,-c(1,2,3)],
-                                                                y_val = dt_list$fre_mtpl2_freq$ClaimNb[-train_rows]))
-  
-    results[[iter]]$GLM_XGB = predict(models[[iter]]$GLM_XGB_model,
-                                    dt_list$fre_mtpl2_freq[-train_rows,-c(1,2,3)])
-  
-  
-  losses$GLM_XGB[i] = poisson_deviance(y_true = results[[iter]]$actual,
-                                       y_pred = results[[iter]]$GLM_XGB)
+  # info_helper(n=paste0(iter," Boosted GLM"))
+  # 
+  # models[[iter]]$GLM_XGB_model = train_GLM_XGBoosted(glm_model = models[[iter]]$glm_model,
+  #                                                    dt = dt_list$fre_mtpl2_freq[train_rows,-c(1,2,3)],
+  #                                                    y = dt_list$fre_mtpl2_freq$ClaimNb[train_rows],
+  #                                                    vdt = list(x_val = dt_list$fre_mtpl2_freq[-train_rows,-c(1,2,3)],
+  #                                                               y_val = dt_list$fre_mtpl2_freq$ClaimNb[-train_rows]))
+  # 
+  #   results[[iter]]$GLM_XGB = predict(models[[iter]]$GLM_XGB_model,
+  #                                   dt_list$fre_mtpl2_freq[-train_rows,-c(1,2,3)])
+  # 
+  # 
+  # losses$GLM_XGB[i] = poisson_deviance(y_true = results[[iter]]$actual,
+  #                                      y_pred = results[[iter]]$GLM_XGB)
 
   
   # GLM * XGBoost  -------------------------------------------
   
-  info_helper(n=paste0(iter," glm with XGB multipl"))
-  
-  models[[iter]]$multipl_GLM_XGB = train_multipl_GLM_XGB(glm_model = models[[iter]]$glm_model,
-                                                         dt = dt_list$fre_mtpl2_freq[train_rows,-c(1,2,3)],
-                                                         y = dt_list$fre_mtpl2_freq$ClaimNb[train_rows],
-                                                         vdt = list(x_val = dt_list$fre_mtpl2_freq[-train_rows,-c(1,2,3)],
-                                                                    y_val = dt_list$fre_mtpl2_freq$ClaimNb[-train_rows])
-  )
-  
-  results[[iter]]$multipl_GLM_XGB = predict(models[[iter]]$multipl_GLM_XGB,
-                                            dt_list$fre_mtpl2_freq[-train_rows,-c(1,2,3)])
-  
-  losses$multipl_GLM_XGB[i] = poisson_deviance(y_true = results[[iter]]$actual,
-                                               y_pred = results[[iter]]$multipl_GLM_XGB)
+  # info_helper(n=paste0(iter," glm with XGB multipl"))
+  # 
+  # models[[iter]]$multipl_GLM_XGB = train_multipl_GLM_XGB(glm_model = models[[iter]]$glm_model,
+  #                                                        dt = dt_list$fre_mtpl2_freq[train_rows,-c(1,2,3)],
+  #                                                        y = dt_list$fre_mtpl2_freq$ClaimNb[train_rows],
+  #                                                        vdt = list(x_val = dt_list$fre_mtpl2_freq[-train_rows,-c(1,2,3)],
+  #                                                                   y_val = dt_list$fre_mtpl2_freq$ClaimNb[-train_rows])
+  # )
+  # 
+  # results[[iter]]$multipl_GLM_XGB = predict(models[[iter]]$multipl_GLM_XGB,
+  #                                           dt_list$fre_mtpl2_freq[-train_rows,-c(1,2,3)])
+  # 
+  # losses$multipl_GLM_XGB[i] = poisson_deviance(y_true = results[[iter]]$actual,
+  #                                              y_pred = results[[iter]]$multipl_GLM_XGB)
 
   # XGBoost intialised with GLM  -------------------------------------------
   
@@ -178,6 +180,28 @@ for (i in 1:CV){
   # 
   # losses$XGB_init_GLM[i] = poisson_deviance(y_true = results[[iter]]$actual,
   #                                           y_pred = results[[iter]]$XGB_init_GLM)  
+  
+  
+  # distilltrees
+  
+  info_helper(n=paste0(iter, " distilltree"))
+  
+  models[[iter]]$distilltree_model <- fit_distilltree(
+    data = dt_list$fre_mtpl2_freq[train_rows, -c(1,3)],
+    vdt = list(x_val = dt_list$fre_mtpl2_freq[-train_rows, -c(1,3)],
+               y_val = dt_list$fre_mtpl2_freq$ClaimNb[-train_rows]),
+    num_features = c("VehPower", "VehAge", "DrivAge", "BonusMalus", "Density"),
+    cat_features = c("VehBrand", "VehGas", "Region")
+  )
+  
+  results[[iter]]$distilltree = predict(
+    models[[iter]]$distilltree_model,
+    dt_list$fre_mtpl2_freq[-train_rows, -c(1,3)]
+  )
+  
+  losses$distilltree[i] = poisson_deviance(y_true = results[[iter]]$actual, y_pred = results[[iter]]$distilltree)
+
+
 }
 
 sink(NULL)

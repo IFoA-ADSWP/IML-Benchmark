@@ -9,6 +9,8 @@ slice = dplyr::slice
 rename = dplyr::rename
 
 seed = 2
+
+
 set.seed(seed)
 
 # load data objects

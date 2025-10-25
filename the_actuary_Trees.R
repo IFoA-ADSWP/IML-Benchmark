@@ -318,3 +318,20 @@ analysis %>%
   slice_sample(prop = 0.25) %>% 
   ggplot(aes(x = actual,y=poiss))+geom_point()+facet_wrap(~name)
 
+
+
+#GAM model output
+summary(models$CV_1$GAM_model)
+summary(models$CV_2$GAM_model)
+summary(models$CV_3$GAM_model)
+summary(models$CV_4$GAM_model)
+summary(models$CV_5$GAM_model)
+
+sm <- models$CV_1$GAM_model$smooth[[1]] 
+sm
+
+# Choose a range of driver ages
+x_vals <- data.frame(DrivAge = seq(18, 80, by = 2))
+
+# Compute the basis matrix B(x)
+B <- mgcv::PredictMat(sm, x_vals)

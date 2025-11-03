@@ -266,59 +266,59 @@ losses %>%
                                                  count(k) %>% pull(n)))) %>% 
   janitor::adorn_totals()
 
-analysis %>%
-  filter(name!="homog") %>%
-  # filter(name %in% c("train_GLM_w_XGB","multipl_GLM_XGB")) %>% 
-  rename(model=name) %>% 
-  ggplot(aes(x = poiss,fill=model,color=model,linetype=model))+
-  geom_density(alpha=0.3,size=1)+
-  ggplot2::scale_fill_manual(values = c("blue","yellow","green","red","white"))+
-  xlim(0,0.75)+
-  # facet_wrap(~name)+
-  ggdark::dark_theme_classic()+
-  # theme(panel.grid.minor = element_line(colour="darkgrey", size=0.01,linetype = 3))+
-  ggtitle("Poisson deviance per observation, per model")+
-  xlab("Poisson deviance")
-
-analysis %>%
-  filter(name!="homog") %>%
-  # filter(name %in% c("train_GLM_w_XGB","multipl_GLM_XGB")) %>% 
-  rename(model=name) %>% 
-  ggplot(aes(x = poiss))+
-  facet_wrap(~model,ncol = 1)+
-  geom_density(alpha=0.3,size=0.5)+
-  ggplot2::scale_fill_manual(values = c("blue","yellow","green","red","white"))+
-  xlim(0,0.75)+
-  # facet_wrap(~name)+
-  ggdark::dark_theme_classic()+
-  # theme(panel.grid.minor = element_line(colour="darkgrey", size=0.01,linetype = 3))+
-  ggtitle("Poisson deviance per observation, per model")+
-  xlab("Poisson deviance")
-
-# lift chart
-multiple_lift(y_true = bind_rows(results,.id = "id") %>% pull(actual),
-              y_pred_df = bind_rows(results,.id = "id") %>% select(glm,
-                                                                   XGB,
-                                                                   homog,
-                                                                   GLM_XGB))+
-  ggtitle("Combined lift chart")+
-  xlab("Tiles")+
-  ylab("Implied frequency")+
-  ggdark::dark_theme_classic()
-
-# remark on glm - if model objects are loaded, this will show differences in betas 
-# for base glm and glm with xgb as predictor. we can see how much the params differ 
-merge(coefficients(models$CV_1$train_GLM_w_XGB$glm_model) %>% data.frame() %>% set_names("glm(xgb)") %>% rownames_to_column() ,
-      coefficients(models$CV_1$glm_model) %>% data.frame()  %>% set_names("glm") %>% rownames_to_column(),
-      by = "rowname",all.x=T) %>% mutate(diff_perc = scales::percent(`glm(xgb)`/glm - 1,0.1)) %>% mutate_at(vars(contains("glm")),scales::number,0.01)
-
-
-
-analysis %>% 
-  slice_sample(prop = 0.25) %>% 
-  ggplot(aes(x = actual,y=poiss))+geom_point()+facet_wrap(~name)
-
-
+# analysis %>%
+#   filter(name!="homog") %>%
+#   # filter(name %in% c("train_GLM_w_XGB","multipl_GLM_XGB")) %>% 
+#   rename(model=name) %>% 
+#   ggplot(aes(x = poiss,fill=model,color=model,linetype=model))+
+#   geom_density(alpha=0.3,size=1)+
+#   ggplot2::scale_fill_manual(values = c("blue","yellow","green","red","white"))+
+#   xlim(0,0.75)+
+#   # facet_wrap(~name)+
+#   ggdark::dark_theme_classic()+
+#   # theme(panel.grid.minor = element_line(colour="darkgrey", size=0.01,linetype = 3))+
+#   ggtitle("Poisson deviance per observation, per model")+
+#   xlab("Poisson deviance")
+# 
+# analysis %>%
+#   filter(name!="homog") %>%
+#   # filter(name %in% c("train_GLM_w_XGB","multipl_GLM_XGB")) %>% 
+#   rename(model=name) %>% 
+#   ggplot(aes(x = poiss))+
+#   facet_wrap(~model,ncol = 1)+
+#   geom_density(alpha=0.3,size=0.5)+
+#   ggplot2::scale_fill_manual(values = c("blue","yellow","green","red","white"))+
+#   xlim(0,0.75)+
+#   # facet_wrap(~name)+
+#   ggdark::dark_theme_classic()+
+#   # theme(panel.grid.minor = element_line(colour="darkgrey", size=0.01,linetype = 3))+
+#   ggtitle("Poisson deviance per observation, per model")+
+#   xlab("Poisson deviance")
+# 
+# # lift chart
+# multiple_lift(y_true = bind_rows(results,.id = "id") %>% pull(actual),
+#               y_pred_df = bind_rows(results,.id = "id") %>% select(glm,
+#                                                                    XGB,
+#                                                                    homog,
+#                                                                    GLM_XGB))+
+#   ggtitle("Combined lift chart")+
+#   xlab("Tiles")+
+#   ylab("Implied frequency")+
+#   ggdark::dark_theme_classic()
+# 
+# # remark on glm - if model objects are loaded, this will show differences in betas 
+# # for base glm and glm with xgb as predictor. we can see how much the params differ 
+# merge(coefficients(models$CV_1$train_GLM_w_XGB$glm_model) %>% data.frame() %>% set_names("glm(xgb)") %>% rownames_to_column() ,
+#       coefficients(models$CV_1$glm_model) %>% data.frame()  %>% set_names("glm") %>% rownames_to_column(),
+#       by = "rowname",all.x=T) %>% mutate(diff_perc = scales::percent(`glm(xgb)`/glm - 1,0.1)) %>% mutate_at(vars(contains("glm")),scales::number,0.01)
+# 
+# 
+# 
+# analysis %>% 
+#   slice_sample(prop = 0.25) %>% 
+#   ggplot(aes(x = actual,y=poiss))+geom_point()+facet_wrap(~name)
+# 
+# 
 
 #GAM model output
 summary(models$CV_1$GAM_model)
@@ -327,11 +327,8 @@ summary(models$CV_3$GAM_model)
 summary(models$CV_4$GAM_model)
 summary(models$CV_5$GAM_model)
 
-sm <- models$CV_1$GAM_model$smooth[[1]] 
-sm
+#Plot
+gratia::draw(models$CV_1$GAM_model)
 
-# Choose a range of driver ages
-x_vals <- data.frame(DrivAge = seq(18, 80, by = 2))
 
-# Compute the basis matrix B(x)
-B <- mgcv::PredictMat(sm, x_vals)
+gam.check(models$CV_1$GAM_model)

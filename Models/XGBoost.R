@@ -15,23 +15,6 @@ train_XGBoost = function(dt,
                          default_params = T
 ){
   
-  # #parameters list
-  # params <- list(
-  #   
-  #   #function inputs
-  #   eta=eta,
-  #   gamma=gamma,
-  #   max_depth=max_depth,
-  #   min_child_weight=min_child_weight,
-  #   subsample=subsample,
-  #   colsample_bytree=colsample_bytree,
-  #   tweedie_variance_power=tweedie_variance_power,
-  #   
-  #   #Fixed
-  #   objective = objective,
-  #   eval_metric = eval_metric
-  # )
-  
   if(default_params){
     
     params <- list(

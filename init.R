@@ -4,6 +4,7 @@ library(reticulate)
 library(tensorflow)
 library(keras)
 library(mlrMBO)
+remotes::install_github("IFoA-ADSWP/IBLM")
 
 slice = dplyr::slice
 rename = dplyr::rename

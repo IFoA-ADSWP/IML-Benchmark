@@ -98,10 +98,12 @@ for (i in 1:CV){
   
   # GAM ------------------------------------------------- 
   
-  # info_helper(n=paste0(iter," GAM"))
-  # models[[iter]]$GAM = NA
-  # results[[iter]]$GAM = NA
-  # losses$GAM[i] = NA
+  models[[iter]]$GAM_model   <- train_GAM(train_df)
+  results[[iter]]$GAM        <- predict_GAM(models[[iter]]$GAM_model,   test_df, type = "response")
+  losses$GAM[i] <- poisson_deviance(results[[iter]]$actual, results[[iter]]$GAM)
+  
+ 
+  
   
   # EBM ------------------------------------------------- 
   

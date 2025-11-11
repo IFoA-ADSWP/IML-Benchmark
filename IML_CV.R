@@ -97,22 +97,20 @@ for (i in 1:CV){
                                    y_pred = results[[iter]]$XGB)
   
   # GAM ------------------------------------------------- 
-  
+
   models[[iter]]$GAM_model   <- train_GAM(train_df)
   results[[iter]]$GAM        <- predict_GAM(models[[iter]]$GAM_model,   test_df, type = "response")
   losses$GAM[i] <- poisson_deviance(results[[iter]]$actual, results[[iter]]$GAM)
-  
- 
-  
+
   
   # EBM ------------------------------------------------- 
-  
-  # info_helper(n=paste0(iter," EBM"))
-  # models[[iter]]$EBM = NA
-  # results[[iter]]$EBM = NA
-  # losses$EBM[i] = NA
-    
-  
+   train_df <- dt_list$fre_mtpl2_freq[train_rows, -c(1,3)]
+   test_df  <- dt_list$fre_mtpl2_freq[test_rows, -c(1,3)]
+   info_helper(n=paste0(iter," EBM"))
+   models[[iter]]$EBM <- train_EBM(train_df, train_df$ClaimNb)   
+   ebm_out <- predict_EBM(models[[iter]]$EBM$model, test_df, target = "ClaimNb")
+   results[[iter]]$EBM <- ebm_out$predictions
+   losses$EBM[i] <- poisson_deviance( y_true = ebm_out$actuals,y_pred = ebm_out$predictions )    
 }
 
 sink(NULL)
@@ -153,7 +151,7 @@ analysis = bind_rows(results,.id = "id")  %>%
          poiss = Vectorize(poisson_deviance)(y_true = actual,
                                              y_pred = value)) 
 
-# ovarall and per fold results
+# overall and per fold results
 poiss_per_CV = rbind(losses,
                      losses %>%
                        pivot_longer(cols = !CV) %>%
@@ -217,4 +215,5 @@ multiple_lift(y_true = bind_rows(results,.id = "id") %>% pull(actual),
 analysis %>% 
   slice_sample(prop = 0.25) %>% 
   ggplot(aes(x = actual,y=poiss))+geom_point()+facet_wrap(~name)
+
 

@@ -3,8 +3,10 @@
 .RData
 .Ruserdata
 .RData*
-
+*.rds
 .Rproj.user/
+
+venv/
 
 misc
 

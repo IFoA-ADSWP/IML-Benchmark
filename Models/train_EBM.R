@@ -1,10 +1,14 @@
 # models/train_EBM.R
 
 train_EBM <- function(dt, y) {
-  library(reticulate)
   
-  interpret <- import("interpret.glassbox")
-  ebm <- interpret$ExplainableBoostingRegressor(n_jobs = -1, max_rounds = 100)
+  ebm <- interpret$ExplainableBoostingRegressor(n_jobs = 1L, 
+                                                max_rounds = 1000L,
+                                                objective = "poisson_deviance",
+                                                max_bins = 100L,
+                                                learning_rate = 0.06,
+                                                early_stopping_rounds = 5L,
+                                                early_stopping_tolerance = 1e-4)
   
   X_train <- dt
   y_train <- as.numeric(y)

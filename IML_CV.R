@@ -1,4 +1,7 @@
 source("init.R")
+source("py_init.R")
+source("Models/train_GAM.R")
+source("Models/train_EBM.R")
 
 CV = 5
 
@@ -22,6 +25,10 @@ for (i in 1:CV){
   test_i = (i %% 5) + 1
   test_rows = which(CV_vec == test_i)
   train_rows = which(CV_vec != i & CV_vec != test_i)
+  
+  train_df = dt_list$fre_mtpl2_freq[train_rows,-c(1,3)]
+  test_df  = dt_list$fre_mtpl2_freq[test_rows,-c(1,3)]
+  valid_df = dt_list$fre_mtpl2_freq[valid_rows,-c(1,3)]
   
   iter = paste0("CV_",i)
   
@@ -49,10 +56,11 @@ for (i in 1:CV){
   
   models[[iter]]$glm_model = glm(formula = ClaimNb~.,
                                  family = poisson,
-                                 data = dt_list$fre_mtpl2_freq[train_rows,-c(1,3)])
+                                 data = train_df)
   
   results[[iter]]$GLM = as.vector(predict(models[[iter]]$glm_model,
-                                          dt_list$fre_mtpl2_freq[test_rows,-c(1,3)],type="response"))
+                                          test_df,
+                                          type="response"))
   
   losses$GLM[i] = poisson_deviance(y_true = results[[iter]]$actual,
                                    y_pred = results[[iter]]$GLM)
@@ -61,13 +69,13 @@ for (i in 1:CV){
   
   info_helper(n=paste0(iter," IBLM"))
   
-  models[[iter]]$IBLM = IBLM::train_iblm_xgb(df_list = list(train = dt_list$fre_mtpl2_freq[train_rows,-c(1,3)],
-                                                            validate = dt_list$fre_mtpl2_freq[valid_rows,-c(1,3)]),
+  models[[iter]]$IBLM = IBLM::train_iblm_xgb(df_list = list(train = train_df,validate = valid_df),
                                              family = "poisson",
                                              response_var = "ClaimNb")
   
   results[[iter]]$IBLM = as.vector(predict(models[[iter]]$IBLM,
-                                           dt_list$fre_mtpl2_freq[test_rows,-c(1,3)],type="response"))
+                                           test_df,
+                                           type="response"))
   
   losses$IBLM[i] = poisson_deviance(y_true = results[[iter]]$actual,
                                     y_pred = results[[iter]]$IBLM)
@@ -77,40 +85,42 @@ for (i in 1:CV){
   info_helper(n=paste0(iter," XGB"))
   
   models[[iter]]$XGB = xgb.train(
-    data = xgb.DMatrix(data.matrix(dt_list$fre_mtpl2_freq[train_rows,-c(1,2,3)]),
-                       label = dt_list$fre_mtpl2_freq$ClaimNb[train_rows]), 
-    watchlist = list(validation = xgb.DMatrix(data.matrix(dt_list$fre_mtpl2_freq[valid_rows,-c(1,2,3)]),
-                                              label = dt_list$fre_mtpl2_freq$ClaimNb[valid_rows])),
+    data = xgb.DMatrix(data.matrix(train_df[,-1]),label = train_df$ClaimNb), 
+    watchlist = list(validation = xgb.DMatrix(data.matrix(valid_df[,-1]),label = valid_df$ClaimNb)),
     params = list(objective = "count:poisson",eval_metric = "poisson-nloglik"),
     nrounds = 1000,
     early_stopping_rounds = 10,
     verbose = 1
   )
   
-  results[[iter]]$XGB = as.vector(
-    predict(models[[iter]]$XGB,
-            xgb.DMatrix(data.matrix(dt_list$fre_mtpl2_freq[test_rows,-c(1,2,3)])),
-            type="response")
-  )
+  results[[iter]]$XGB = as.vector(predict(models[[iter]]$XGB,
+                                          xgb.DMatrix(data.matrix(test_df[,-1])),
+                                          type="response"))
   
   losses$XGB[i] = poisson_deviance(y_true = results[[iter]]$actual,
                                    y_pred = results[[iter]]$XGB)
   
   # GAM ------------------------------------------------- 
 
-  models[[iter]]$GAM_model   <- train_GAM(train_df)
-  results[[iter]]$GAM        <- predict_GAM(models[[iter]]$GAM_model,   test_df, type = "response")
-  losses$GAM[i] <- poisson_deviance(results[[iter]]$actual, results[[iter]]$GAM)
-
+  models[[iter]]$GAM_model = train_GAM(train_df)
   
+  results[[iter]]$GAM= predict_GAM(models[[iter]]$GAM_model,
+                                   test_df,type = "response")
+  
+  losses$GAM[i] = poisson_deviance(results[[iter]]$actual, 
+                                   results[[iter]]$GAM)
+
   # EBM ------------------------------------------------- 
-   train_df <- dt_list$fre_mtpl2_freq[train_rows, -c(1,3)]
-   test_df  <- dt_list$fre_mtpl2_freq[test_rows, -c(1,3)]
-   info_helper(n=paste0(iter," EBM"))
-   models[[iter]]$EBM <- train_EBM(train_df, train_df$ClaimNb)   
-   ebm_out <- predict_EBM(models[[iter]]$EBM$model, test_df, target = "ClaimNb")
-   results[[iter]]$EBM <- ebm_out$predictions
-   losses$EBM[i] <- poisson_deviance( y_true = ebm_out$actuals,y_pred = ebm_out$predictions )    
+  
+  info_helper(n=paste0(iter," EBM"))
+  
+  models[[iter]]$EBM = train_EBM(train_df[,-1], train_df$ClaimNb)
+  
+  ebm_out = predict_EBM(models[[iter]]$EBM$model, test_df[,-1])
+  
+  results[[iter]]$EBM = ebm_out$predictions
+  
+  losses$EBM[i] = poisson_deviance(y_true = test_df$ClaimNb,y_pred = ebm_out$predictions)
 }
 
 sink(NULL)
@@ -118,14 +128,14 @@ sink(NULL)
 # save files
 # saveRDS(list(losses = losses,
 #              results = results,
-#              models = models),file = "The_Actuary_IML.rds")
+#              models = models),file = "The_Actuary_IML2.rds")
 
 # temp = readRDS("The_Actuary_IML.rds")
 # losses = temp$losses
 # results = temp$results
 
-# saveRDS(list(losses = losses,
-#              results = results),file = "Results/The_Actuary_IML_wo_models.rds")
+saveRDS(list(losses = losses,
+             results = results),file = "Results/The_Actuary_IML_wo_models_2.rds")
 
 # check calibration
 bind_rows(results,.id = "id") %>% 
@@ -166,7 +176,7 @@ poiss_per_CV %>%
   mutate_if(is.numeric,~ if_else(. == homog, .,1 -  ./homog)) %>% 
   select(-homog) %>% 
   mutate_if(is.numeric,scales::percent,0.1) %>% 
-  select(CV,GLM,IBLM,GAM,EBM)
+  select(CV,GLM,IBLM,GAM,EBM,XGB)
 
 
 losses %>% 

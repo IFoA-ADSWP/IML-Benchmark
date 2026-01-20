@@ -2,6 +2,7 @@ source("init.R")
 source("py_init.R")
 source("Models/train_GAM.R")
 source("Models/train_EBM.R")
+source("Models/XGBoost_BO.R")
 
 CV = 5
 
@@ -17,7 +18,8 @@ losses = data.frame(CV = paste0("CV_",1:CV),
                     IBLM = NA,
                     XGB = NA,
                     GAM = NA,
-                    EBM = NA)
+                    EBM = NA,
+                    XGBBO=NA)
 
 for (i in 1:CV){
   
@@ -99,6 +101,29 @@ for (i in 1:CV){
   
   losses$XGB[i] = poisson_deviance(y_true = results[[iter]]$actual,
                                    y_pred = results[[iter]]$XGB)
+
+  # XGB BO
+  info_helper(n=paste0(iter, " XGBBO"))
+
+  models[[iter]]$XGBBO <- train_XGB_BO(
+    train_df,
+    valid_df,
+    n_trials = 20
+  )
+
+  results[[iter]]$XGBBO <- as.vector(
+    predict(
+      models[[iter]]$XGBBO,
+      xgb.DMatrix(data.matrix(test_df[,-1])),
+      type="response"
+      )
+    )
+
+  losses$XGBBO[i] = poisson_deviance(y_true = results[[iter]]$actual,
+                                   y_pred = results[[iter]]$XGBBO)
+
+
+  
   
   # GAM ------------------------------------------------- 
 
@@ -154,7 +179,7 @@ bind_rows(results,.id = "id") %>%
 
 analysis = bind_rows(results,.id = "id")  %>% 
   # select(id,actual,glm,XGB, homog, train_GLM_w_XGB, GLM_XGB,IBLM) %>% 
-  pivot_longer(cols = GLM:EBM) %>% 
+  pivot_longer(cols = GLM:XGBBO) %>% 
   filter(!is.na(value)) %>% 
   mutate(actual = actual,
          value = value,
@@ -176,7 +201,7 @@ poiss_per_CV %>%
   mutate_if(is.numeric,~ if_else(. == homog, .,1 -  ./homog)) %>% 
   select(-homog) %>% 
   mutate_if(is.numeric,scales::percent,0.1) %>% 
-  select(CV,GLM,IBLM,GAM,EBM,XGB)
+  select(CV,GLM,IBLM,GAM,EBM,XGB,XGBBO)
 
 
 losses %>% 
@@ -216,7 +241,8 @@ multiple_lift(y_true = bind_rows(results,.id = "id") %>% pull(actual),
               y_pred_df = bind_rows(results,.id = "id") %>% select(GLM,
                                                                    XGB,
                                                                    homog,
-                                                                   IBLM))+
+                                                                   IBLM,
+                                                                   XGBBO))+
   ggtitle("Combined lift chart")+
   xlab("Tiles")+
   ylab("Implied frequency")

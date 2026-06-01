@@ -1,6 +1,8 @@
 library(tidyverse)
 library(xgboost)
-remotes::install_github("IFoA-ADSWP/IBLM")
+library(IBLM)
+library(tensorflow)
+library(keras)
 
 slice = dplyr::slice
 rename = dplyr::rename
@@ -13,10 +15,10 @@ dt_list = list()
 
 # Data
 dt_list$fre_mtpl2_freq = read.csv("freMTPL2freq.csv") %>%  
-
-  mutate(  Exposure = pmin(1, Exposure),
-           ClaimNb = pmin(15, ClaimNb / Exposure)
-           ) %>% 
+  mutate(
+    Exposure = pmin(1, Exposure),
+    ClaimNb = pmin(15, ClaimNb / Exposure)
+    ) %>% 
   slice(sample(1:nrow(.),replace = F))
 
 #Poisson Deviance - Loss function

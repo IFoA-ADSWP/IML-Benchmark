@@ -6,10 +6,13 @@
 *.rds
 .Rproj.user/
 
-venv/
+.venv/
 
 misc
 
 Results/
 
 Results
+
+.lintr
+

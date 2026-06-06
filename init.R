@@ -1,8 +1,10 @@
 library(tidyverse)
 library(xgboost)
+# library(IBLM)
+# devtools::install_github("IFoA-ADSWP/IBLM", ref = "prior_glm")
 library(IBLM)
 library(tensorflow)
-library(keras)
+library(keras3)
 
 slice = dplyr::slice
 rename = dplyr::rename
@@ -19,6 +21,7 @@ dt_list$fre_mtpl2_freq = read.csv("freMTPL2freq.csv") %>%
     Exposure = pmin(1, Exposure),
     ClaimNb = pmin(15, ClaimNb / Exposure)
     ) %>% 
+  mutate_if(is.character,factor) %>%
   slice(sample(1:nrow(.),replace = F))
 
 #Poisson Deviance - Loss function
@@ -64,6 +67,8 @@ custom_poisson <- function( y_true, y_pred ) {
   # 2 (μ − y − ylog(μ/y))
   
   K <- backend()
+  
+  browser()
   
   K$mean(2 * (y_pred - y_true - y_true * K$log((y_pred+10^-7)/(y_true+10^-7))))
   

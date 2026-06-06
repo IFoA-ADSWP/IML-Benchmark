@@ -1,12 +1,13 @@
 source("init.R")
 source("py_init.R")
 source("Models/train_GAM.R")
-source("Models/train_EBM.R")
+source("Models/train_XGBoost.R")
+# source("Models/train_EBM.R")
+source("Models/train_IBLM.R")
+source("Models/train_localglmnet.R")
 
 CV = 5
-
 set.seed(1)
-
 CV_vec = sample(1:CV,replace = T,size = nrow(dt_list$fre_mtpl2_freq))
 
 models = list()
@@ -17,7 +18,8 @@ losses = data.frame(CV = paste0("CV_",1:CV),
                     IBLM = NA,
                     XGB = NA,
                     GAM = NA,
-                    EBM = NA)
+                    EBM = NA,
+                    LocalGLMnet = NA)
 
 for (i in 1:CV){
   
@@ -40,7 +42,8 @@ for (i in 1:CV){
                                IBLM = NA,
                                XGB = NA,
                                GAM = NA,
-                               EBM = NA) %>% 
+                               EBM = NA,
+                               LocalGLMnet = NA) %>% 
     mutate(homog = mean(dt_list$fre_mtpl2_freq$ClaimNb[train_rows]))
   
   # homogenous model ------------------------------------------------- 
@@ -69,13 +72,20 @@ for (i in 1:CV){
   
   info_helper(n=paste0(iter," IBLM"))
   
-  models[[iter]]$IBLM = IBLM::train_iblm_xgb(df_list = list(train = train_df,validate = valid_df),
-                                             family = "poisson",
-                                             response_var = "ClaimNb")
+  models[[iter]]$IBLM = IBLM::train_iblm_xgb(
+    df_list = list(train = train_df, validate = valid_df),
+    response_var = "ClaimNb",
+    family = "poisson",
+    glm_model = models[[iter]]$glm_model,
+    params = list(objective = "count:poisson",eval_metric = "poisson-nloglik"),
+    nrounds = 1000,
+    early_stopping_rounds = 10,
+    verbose = 1
+  )
   
   results[[iter]]$IBLM = as.vector(predict(models[[iter]]$IBLM,
                                            test_df,
-                                           type="response"))
+                                           type = "response"))
   
   losses$IBLM[i] = poisson_deviance(y_true = results[[iter]]$actual,
                                     y_pred = results[[iter]]$IBLM)
@@ -112,15 +122,36 @@ for (i in 1:CV){
 
   # EBM ------------------------------------------------- 
   
-  info_helper(n=paste0(iter," EBM"))
-  
-  models[[iter]]$EBM = train_EBM(train_df[,-1], train_df$ClaimNb)
-  
-  ebm_out = predict_EBM(models[[iter]]$EBM$model, test_df[,-1])
-  
-  results[[iter]]$EBM = ebm_out$predictions
-  
-  losses$EBM[i] = poisson_deviance(y_true = test_df$ClaimNb,y_pred = ebm_out$predictions)
+  # info_helper(n=paste0(iter," EBM"))
+  # 
+  # models[[iter]]$EBM = train_EBM(train_df[,-1], train_df$ClaimNb)
+  # 
+  # ebm_out = predict_EBM(models[[iter]]$EBM$model, test_df[,-1])
+  # 
+  # results[[iter]]$EBM = ebm_out$predictions
+  # 
+  # losses$EBM[i] = poisson_deviance(y_true = test_df$ClaimNb,y_pred = ebm_out$predictions)
+
+  # LocalGLMnet -------------------------------------------------
+
+  info_helper(n=paste0(iter," LocalGLMnet"))
+
+  models[[iter]]$LocalGLMnet = fit_localglmnet(
+    train_df = train_df,
+    test_df = test_df,
+    val_df = valid_df,
+    target_col = "ClaimNb",
+    verbose = 1
+  )
+
+  results[[iter]]$LocalGLMnet = as.vector(
+    predict(models[[iter]]$LocalGLMnet$model,
+            models[[iter]]$LocalGLMnet$X_T,
+            verbose = 0)[,1]
+  )
+
+  losses$LocalGLMnet[i] = poisson_deviance(y_true = results[[iter]]$actual,
+                                           y_pred = results[[iter]]$LocalGLMnet)
 }
 
 sink(NULL)
@@ -135,7 +166,7 @@ sink(NULL)
 # results = temp$results
 
 saveRDS(list(losses = losses,
-             results = results),file = "Results/The_Actuary_IML_wo_models_2.rds")
+             results = results),file = "Results/IML_v1.rds")
 
 # check calibration
 bind_rows(results,.id = "id") %>% 
@@ -154,7 +185,7 @@ bind_rows(results,.id = "id") %>%
 
 analysis = bind_rows(results,.id = "id")  %>% 
   # select(id,actual,glm,XGB, homog, train_GLM_w_XGB, GLM_XGB,IBLM) %>% 
-  pivot_longer(cols = GLM:EBM) %>% 
+  pivot_longer(cols = GLM:LocalGLMnet) %>% 
   filter(!is.na(value)) %>% 
   mutate(actual = actual,
          value = value,
@@ -176,7 +207,7 @@ poiss_per_CV %>%
   mutate_if(is.numeric,~ if_else(. == homog, .,1 -  ./homog)) %>% 
   select(-homog) %>% 
   mutate_if(is.numeric,scales::percent,0.1) %>% 
-  select(CV,GLM,IBLM,GAM,EBM,XGB)
+  select(CV,GLM,IBLM,GAM,EBM,XGB,LocalGLMnet)
 
 
 losses %>% 
@@ -216,7 +247,8 @@ multiple_lift(y_true = bind_rows(results,.id = "id") %>% pull(actual),
               y_pred_df = bind_rows(results,.id = "id") %>% select(GLM,
                                                                    XGB,
                                                                    homog,
-                                                                   IBLM))+
+                                                                   IBLM,
+                                                                   LocalGLMnet))+
   ggtitle("Combined lift chart")+
   xlab("Tiles")+
   ylab("Implied frequency")

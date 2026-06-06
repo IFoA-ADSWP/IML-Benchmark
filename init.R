@@ -5,6 +5,8 @@ library(xgboost)
 library(IBLM)
 library(tensorflow)
 library(keras3)
+library(shapviz)
+library(iml)
 
 slice = dplyr::slice
 rename = dplyr::rename
@@ -37,6 +39,14 @@ info_helper = function(n,t="misc/sink.txt"){
   
 }
 
+gg_style <- list(
+  theme_minimal(base_size = 12),
+  theme(
+    plot.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    legend.position = "bottom"
+  )
+)
 
 poiss_dens = function(an = analysis,
                       m = c("multipl_SAV_GLM_XGB","multipl_GLM_XGB")){

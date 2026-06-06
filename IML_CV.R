@@ -157,8 +157,14 @@ for (i in 1:CV){
 sink(NULL)
 
 # save files
-
-
+# 
+# keras3::save_model(
+#   model = models[["CV_1"]]$LocalGLMnet$model,
+#   filepath = "Results/models_CV1_localglmnet.keras",
+#   overwrite = TRUE
+# )
+# 
+# saveRDS(models[["CV_1"]], file = "Results/models_CV1.rds")
 
 saveRDS(list(losses = losses,results = results),file = "Results/IML_v1.rds")
 

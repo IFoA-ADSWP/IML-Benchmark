@@ -246,3 +246,121 @@ predict_localglmnet <- function(model_obj, new_df) {
   X_new <- transform_localglmnet_input(new_df[, model_obj$encoder$feature_cols, drop = FALSE], model_obj$encoder)
   as.numeric(predict(model_obj$model, X_new, verbose = 0)[, 1])
 }
+
+
+plot_localglmnet_attention <- function(model,
+                                       X,
+                                       feature_names = colnames(X),
+                                       plot_vars = NULL,
+                                       encoder = NULL,
+                                       raw_df = NULL,
+                                       sample_size = 5000,
+                                       ncol = 3) {
+  stopifnot(length(feature_names) == ncol(X), !is.null(encoder))
+  if (is.null(raw_df) || !is.data.frame(raw_df) || nrow(raw_df) != nrow(X)) {
+    stop("raw_df must be a data.frame aligned row-wise with X.")
+  }
+
+  candidate_vars <- c(encoder$num_cols, encoder$cat_cols)
+  selected_vars <- if (is.null(plot_vars) || length(plot_vars) == 0) candidate_vars else intersect(plot_vars, candidate_vars)
+  if (length(selected_vars) == 0) stop("No plot_vars matched original variables.")
+
+  col_groups <- lapply(selected_vars, function(v) {
+    if (v %in% encoder$num_cols) v else grep(paste0("^", v, "_"), feature_names, value = TRUE)
+  })
+  names(col_groups) <- selected_vars
+  col_groups <- col_groups[vapply(col_groups, length, integer(1)) > 0]
+  selected_vars <- names(col_groups)
+
+  attention_idx <- which(vapply(model$model$layers, function(l) identical(l$name, "Attention"), logical(1)))
+  if (length(attention_idx) != 1) {
+    stop("Could not uniquely locate 'Attention' layer in localglmnet model.")
+  }
+  attention_layer <- keras3::keras_model(inputs = model$model$input, outputs = model$model$layers[[attention_idx]]$output)
+  attention_weights <- predict(attention_layer, X, verbose = 0)
+
+  set.seed(42)
+  sample_idx <- sample(seq_len(nrow(X)), size = min(sample_size, nrow(X)), replace = FALSE)
+
+  plot_blocks <- lapply(selected_vars, function(v) {
+    grp <- col_groups[[v]]
+    grp_idx <- match(grp, feature_names)
+    x_raw <- raw_df[[v]][sample_idx]
+
+    if (v %in% encoder$num_cols && length(grp_idx) == 1) {
+      att <- attention_weights[sample_idx, grp_idx]
+      data.frame(feature_name = v, feature_value = as.numeric(x_raw), value = as.numeric(att), is_numeric = TRUE)
+    } else {
+      att <- rowSums(attention_weights[sample_idx, grp_idx, drop = FALSE] * X[sample_idx, grp_idx, drop = FALSE])
+      x_lbl <- as.character(x_raw)
+      x_lbl[is.na(x_lbl)] <- "[missing]"
+      data.frame(feature_name = v, feature_value = x_lbl, value = as.numeric(att), is_numeric = FALSE)
+    }
+  })
+  plot_df <- do.call(rbind, plot_blocks)
+
+  ggplot2::ggplot(plot_df, ggplot2::aes(x = feature_value, y = value)) +
+    ggplot2::geom_point(alpha = 0.25, size = 0.8, position = ggplot2::position_jitter(width = 0.1, height = 0)) +
+    ggplot2::facet_wrap(~feature_name, scales = "free", ncol = ncol) +
+    ggplot2::labs(title = "Regression Attentions", x = "Original feature values", y = "Regression attention") +
+    ggplot2::theme_minimal()
+}
+
+
+plot_localglmnet_contributions <- function(model,
+                                           X,
+                                           feature_names = colnames(X),
+                                           plot_vars = NULL,
+                                           encoder = NULL,
+                                           raw_df = NULL,
+                                           sample_size = 5000,
+                                           ncol = 3) {
+  stopifnot(length(feature_names) == ncol(X), !is.null(encoder))
+  if (is.null(raw_df) || !is.data.frame(raw_df) || nrow(raw_df) != nrow(X)) {
+    stop("raw_df must be a data.frame aligned row-wise with X.")
+  }
+
+  candidate_vars <- c(encoder$num_cols, encoder$cat_cols)
+  selected_vars <- if (is.null(plot_vars) || length(plot_vars) == 0) candidate_vars else intersect(plot_vars, candidate_vars)
+  if (length(selected_vars) == 0) stop("No plot_vars matched original variables.")
+
+  col_groups <- lapply(selected_vars, function(v) {
+    if (v %in% encoder$num_cols) v else grep(paste0("^", v, "_"), feature_names, value = TRUE)
+  })
+  names(col_groups) <- selected_vars
+  col_groups <- col_groups[vapply(col_groups, length, integer(1)) > 0]
+  selected_vars <- names(col_groups)
+
+  attention_idx <- which(vapply(model$model$layers, function(l) identical(l$name, "Attention"), logical(1)))
+  if (length(attention_idx) != 1) {
+    stop("Could not uniquely locate 'Attention' layer in localglmnet model.")
+  }
+  attention_layer <- keras3::keras_model(inputs = model$model$input, outputs = model$model$layers[[attention_idx]]$output)
+  attention_weights <- predict(attention_layer, X, verbose = 0)
+
+  set.seed(42)
+  sample_idx <- sample(seq_len(nrow(X)), size = min(sample_size, nrow(X)), replace = FALSE)
+
+  plot_blocks <- lapply(selected_vars, function(v) {
+    grp <- col_groups[[v]]
+    grp_idx <- match(grp, feature_names)
+    x_raw <- raw_df[[v]][sample_idx]
+    contribution <- rowSums(attention_weights[sample_idx, grp_idx, drop = FALSE] * X[sample_idx, grp_idx, drop = FALSE])
+
+    if (v %in% encoder$num_cols) {
+      data.frame(feature_name = v, feature_value = as.numeric(x_raw), value = as.numeric(contribution), is_numeric = TRUE)
+    } else {
+      x_lbl <- as.character(x_raw)
+      x_lbl[is.na(x_lbl)] <- "[missing]"
+      data.frame(feature_name = v, feature_value = x_lbl, value = as.numeric(contribution), is_numeric = FALSE)
+    }
+  })
+  plot_df <- do.call(rbind, plot_blocks)
+
+  ggplot2::ggplot(plot_df, ggplot2::aes(x = feature_value, y = value)) +
+    ggplot2::geom_point(alpha = 0.25, size = 0.8, color = "black", position = ggplot2::position_jitter(width = 0.1, height = 0)) +
+    ggplot2::geom_hline(yintercept = 0, color = "orange", linewidth = 0.8) +
+    ggplot2::facet_wrap(~feature_name, scales = "free", ncol = ncol) +
+    ggplot2::labs(title = "Feature Contributions", x = "Original feature values", y = "Contribution") +
+    ggplot2::theme_minimal()
+}

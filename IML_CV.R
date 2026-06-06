@@ -2,7 +2,7 @@ source("init.R")
 source("py_init.R")
 source("Models/train_GAM.R")
 source("Models/train_XGBoost.R")
-# source("Models/train_EBM.R")
+source("Models/train_EBM.R")
 source("Models/train_IBLM.R")
 source("Models/train_localglmnet.R")
 
@@ -122,15 +122,15 @@ for (i in 1:CV){
 
   # EBM ------------------------------------------------- 
   
-  # info_helper(n=paste0(iter," EBM"))
-  # 
-  # models[[iter]]$EBM = train_EBM(train_df[,-1], train_df$ClaimNb)
-  # 
-  # ebm_out = predict_EBM(models[[iter]]$EBM$model, test_df[,-1])
-  # 
-  # results[[iter]]$EBM = ebm_out$predictions
-  # 
-  # losses$EBM[i] = poisson_deviance(y_true = test_df$ClaimNb,y_pred = ebm_out$predictions)
+  info_helper(n=paste0(iter," EBM"))
+
+  models[[iter]]$EBM = train_EBM(train_df[,-1], train_df$ClaimNb)
+
+  ebm_out = predict_EBM(models[[iter]]$EBM$model, test_df[,-1])
+
+  results[[iter]]$EBM = ebm_out$predictions
+
+  losses$EBM[i] = poisson_deviance(y_true = test_df$ClaimNb,y_pred = ebm_out$predictions)
 
   # LocalGLMnet -------------------------------------------------
 
@@ -141,7 +141,7 @@ for (i in 1:CV){
     test_df = test_df,
     val_df = valid_df,
     target_col = "ClaimNb",
-    verbose = 1
+    verbose = 0
   )
 
   results[[iter]]$LocalGLMnet = as.vector(
@@ -157,16 +157,10 @@ for (i in 1:CV){
 sink(NULL)
 
 # save files
-# saveRDS(list(losses = losses,
-#              results = results,
-#              models = models),file = "The_Actuary_IML2.rds")
 
-# temp = readRDS("The_Actuary_IML.rds")
-# losses = temp$losses
-# results = temp$results
 
-saveRDS(list(losses = losses,
-             results = results),file = "Results/IML_v1.rds")
+
+saveRDS(list(losses = losses,results = results),file = "Results/IML_v1.rds")
 
 # check calibration
 bind_rows(results,.id = "id") %>% 

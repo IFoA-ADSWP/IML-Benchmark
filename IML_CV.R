@@ -3,6 +3,7 @@ source("py_init.R")
 source("Models/train_GAM.R")
 source("Models/train_XGBoost.R")
 source("Models/train_EBM.R")
+source("Models/train_ebm2.R")
 source("Models/train_IBLM.R")
 source("Models/train_localglmnet.R")
 
@@ -19,6 +20,7 @@ losses = data.frame(CV = paste0("CV_",1:CV),
                     XGB = NA,
                     GAM = NA,
                     EBM = NA,
+                    EBM_alt = NA,
                     LocalGLMnet = NA)
 
 for (i in 1:CV){
@@ -43,6 +45,7 @@ for (i in 1:CV){
                                XGB = NA,
                                GAM = NA,
                                EBM = NA,
+                               EBM_alt = NA,
                                LocalGLMnet = NA) %>% 
     mutate(homog = mean(dt_list$fre_mtpl2_freq$ClaimNb[train_rows]))
   
@@ -132,6 +135,19 @@ for (i in 1:CV){
 
   losses$EBM[i] = poisson_deviance(y_true = test_df$ClaimNb,y_pred = ebm_out$predictions)
 
+  # EBM (R ebm package) ---------------------------------------------
+
+  info_helper(n=paste0(iter," EBM_alt"))
+
+  models[[iter]]$EBM_alt = train_EBM2(train_df[,-1], train_df$ClaimNb)
+
+  ebm2_out = predict_EBM2(models[[iter]]$EBM_alt$model, test_df)
+
+  results[[iter]]$EBM_alt = ebm2_out$predictions
+
+  losses$EBM_alt[i] = poisson_deviance(y_true = test_df$ClaimNb,
+                                       y_pred = ebm2_out$predictions)
+
   # LocalGLMnet -------------------------------------------------
 
   info_helper(n=paste0(iter," LocalGLMnet"))
@@ -157,16 +173,10 @@ for (i in 1:CV){
 sink(NULL)
 
 # save files
-# 
-# keras3::save_model(
-#   model = models[["CV_1"]]$LocalGLMnet$model,
-#   filepath = "Results/models_CV1_localglmnet.keras",
-#   overwrite = TRUE
-# )
-# 
+
 # saveRDS(models[["CV_1"]], file = "Results/models_CV1.rds")
 
-saveRDS(list(losses = losses,results = results),file = "Results/IML_v1.rds")
+saveRDS(list(losses = losses,results = results),file = "Results/IML_v2.rds")
 
 # check calibration
 bind_rows(results,.id = "id") %>% 
@@ -207,7 +217,7 @@ poiss_per_CV %>%
   mutate_if(is.numeric,~ if_else(. == homog, .,1 -  ./homog)) %>% 
   select(-homog) %>% 
   mutate_if(is.numeric,scales::percent,0.1) %>% 
-  select(CV,GLM,IBLM,GAM,EBM,XGB,LocalGLMnet)
+  select(CV,GLM,IBLM,GAM,EBM,EBM_alt,XGB,LocalGLMnet)
 
 
 losses %>% 

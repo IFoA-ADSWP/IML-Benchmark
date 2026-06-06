@@ -2,24 +2,29 @@ source("init.R")
 source("py_init.R")
 source("Models/train_GAM.R")
 source("Models/train_EBM.R")
+source("Models/train_ebm2.R")
 source("Models/train_localglmnet.R")
+# source("IML_CV.R")
+
+# library(iml)
+# library(shapviz)
+# library(ggplot2)
 
 n_test_subset <- 100000
 plot_var <- "DrivAge"
-out_dir <- "Results/IML_charts_CV5"
+out_dir <- "Results/IML_charts_CV1"
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 set.seed(2026)
-idx_sub <- sample(seq_len(nrow(test_df)), size = n_test_subset, replace = FALSE)
-
-test_df_plot <- test_df[idx_sub, , drop = FALSE]
-x_test <- dplyr::select(test_df_plot, -ClaimNb)
+idx_sub <- sample(seq_len(nrow(test_df_full)), size = n_test_subset, replace = FALSE)
+test_df_charts <- test_df[idx_sub, , drop = FALSE]
+x_test <- dplyr::select(test_df_charts, -ClaimNb)
 
 # GLM PDP via iml -------------------------------------------------------------
 glm_pred <- Predictor$new(
   model = models$CV_5$glm_model,
   data = x_test,
-  y = test_df_plot$ClaimNb,
+  y = test_df_charts$ClaimNb,
   predict.function = function(model, newdata) {
     as.numeric(stats::predict(model, newdata = newdata, type = "response"))
   }
@@ -32,7 +37,7 @@ p_glm <- plot(FeatureEffect$new(glm_pred, feature = plot_var, method = "pdp")) +
 ggsave(file.path(out_dir, "glm_pdp_drivage.png"), p_glm, width = 8, height = 5, dpi = 140)
 
 # IBLM charts from package docs ------------------------------------------------
-iblm_ex <- IBLM::explain_iblm(models$CV_5$IBLM, test_df_plot)
+iblm_ex <- IBLM::explain_iblm(models$CV_5$IBLM, test_df_charts)
 
 p_iblm_scatter <- iblm_ex$beta_corrected_scatter(plot_var) +
   labs(title = "IBLM beta-corrected scatter - DrivAge") +
@@ -50,7 +55,7 @@ ggsave(file.path(out_dir, "iblm_beta_density_drivage.png"), p_iblm_density, widt
 x_local <- transform_localglmnet_input(x_test, models$CV_5$LocalGLMnet$encoder)
 
 p_local_att <- plot_localglmnet_attention(
-  model = models$CV_5$LocalGLMnet,
+  model = models$CV_5$LocalGLMnet$model,
   X = x_local,
   feature_names = colnames(x_local),
   plot_vars = plot_var,
@@ -65,7 +70,7 @@ p_local_att <- plot_localglmnet_attention(
 ggsave(file.path(out_dir, "localglmnet_attention_drivage.png"), p_local_att, width = 8, height = 5, dpi = 140)
 
 p_local_contrib <- plot_localglmnet_contributions(
-  model = models$CV_5$LocalGLMnet,
+  model = models$CV_5$LocalGLMnet$model,
   X = x_local,
   feature_names = colnames(x_local),
   plot_vars = plot_var,
@@ -83,7 +88,7 @@ ggsave(file.path(out_dir, "localglmnet_contribution_drivage.png"), p_local_contr
 gam_pred <- Predictor$new(
   model = models$CV_5$GAM_model,
   data = x_test,
-  y = test_df_plot$ClaimNb,
+  y = test_df_charts$ClaimNb,
   predict.function = function(model, newdata) {
     predict_GAM(model, newdata, type = "response")
   }
@@ -118,6 +123,35 @@ if (!is.na(term_idx)) {
   message("EBM term for DrivAge not found; skipping one-way plot.")
 }
 
+  # EBM_alt (R ebm package) ------------------------------------------------------
+  if (!is.null(models$CV_5$EBM_alt) && !is.null(models$CV_5$EBM_alt$model)) {
+    p_ebm_alt_drv <- plot(
+      models$CV_5$EBM_alt$model,
+      term = plot_var,
+      interactive = FALSE,
+      uncertainty = TRUE
+    ) +
+      labs(
+        title = "EBM_alt term plot - DrivAge",
+        x = "DrivAge",
+        y = "Term contribution (link scale)"
+      ) +
+      gg_style
+
+    ggsave(file.path(out_dir, "ebm_alt_term_drivage.png"), p_ebm_alt_drv, width = 8, height = 5, dpi = 140)
+
+    p_ebm_alt_imp <- plot(
+      models$CV_5$EBM_alt$model,
+      interactive = FALSE
+    ) +
+      labs(title = "EBM_alt term importance") +
+      gg_style
+
+    ggsave(file.path(out_dir, "ebm_alt_importance.png"), p_ebm_alt_imp, width = 8, height = 5, dpi = 140)
+  } else {
+    message("EBM_alt model not found in models$CV_5.rds; run IML_CV.R to train it.")
+  }
+
 # XGBoost SHAP via predict(..., predcontrib=TRUE) + shapviz -------------------
 xgb_shap <- predict(
   models$CV_5$XGB,
@@ -125,7 +159,7 @@ xgb_shap <- predict(
   predcontrib = TRUE
 )
 
-xgb_shap <- xgb_shap[, colnames(xgb_shap) != "(Intercept)", drop = FALSE]
+xgb_shap <- xgb_shap[, colnames(xgb_shap) != "BIAS", drop = FALSE]
 sv <- shapviz::shapviz(xgb_shap, X = as.data.frame(x_test))
 
 p_xgb <- shapviz::sv_dependence(sv, v = plot_var, color_var = NULL) +

@@ -55,7 +55,7 @@ ggsave(file.path(out_dir, "iblm_beta_density_drivage.png"), p_iblm_density, widt
 x_local <- transform_localglmnet_input(x_test, models$CV_5$LocalGLMnet$encoder)
 
 p_local_att <- plot_localglmnet_attention(
-  model = models$CV_5$LocalGLMnet$model,
+  model = models$CV_5$LocalGLMnet,
   X = x_local,
   feature_names = colnames(x_local),
   plot_vars = plot_var,
@@ -70,7 +70,7 @@ p_local_att <- plot_localglmnet_attention(
 ggsave(file.path(out_dir, "localglmnet_attention_drivage.png"), p_local_att, width = 8, height = 5, dpi = 140)
 
 p_local_contrib <- plot_localglmnet_contributions(
-  model = models$CV_5$LocalGLMnet$model,
+  model = models$CV_5$LocalGLMnet,
   X = x_local,
   feature_names = colnames(x_local),
   plot_vars = plot_var,
@@ -111,46 +111,46 @@ if (!is.na(term_idx)) {
     DrivAge = x_test[[plot_var]],
     effect = ebm_terms[, term_idx]
   )
-
+  
   p_ebm <- ggplot(ebm_df, aes(x = DrivAge, y = effect)) +
     geom_point(alpha = 0.18, color = "#2D6A4F") +
     geom_smooth(method = "loess", se = TRUE, color = "#1B4332", fill = "#95D5B2") +
     labs(title = "EBM one-way effect proxy - DrivAge", x = "DrivAge", y = "Additive term effect") +
     gg_style
-
+  
   ggsave(file.path(out_dir, "ebm_oneway_drivage.png"), p_ebm, width = 8, height = 5, dpi = 140)
 } else {
   message("EBM term for DrivAge not found; skipping one-way plot.")
 }
 
-  # EBM_alt (R ebm package) ------------------------------------------------------
-  if (!is.null(models$CV_5$EBM_alt) && !is.null(models$CV_5$EBM_alt$model)) {
-    p_ebm_alt_drv <- plot(
-      models$CV_5$EBM_alt$model,
-      term = plot_var,
-      interactive = FALSE,
-      uncertainty = TRUE
+# EBM_alt (R ebm package) ------------------------------------------------------
+if (!is.null(models$CV_5$EBM_alt) && !is.null(models$CV_5$EBM_alt$model)) {
+  p_ebm_alt_drv <- plot(
+    models$CV_5$EBM_alt$model,
+    term = plot_var,
+    interactive = FALSE,
+    uncertainty = TRUE
+  ) +
+    labs(
+      title = "EBM_alt term plot - DrivAge",
+      x = "DrivAge",
+      y = "Term contribution (link scale)"
     ) +
-      labs(
-        title = "EBM_alt term plot - DrivAge",
-        x = "DrivAge",
-        y = "Term contribution (link scale)"
-      ) +
-      gg_style
-
-    ggsave(file.path(out_dir, "ebm_alt_term_drivage.png"), p_ebm_alt_drv, width = 8, height = 5, dpi = 140)
-
-    p_ebm_alt_imp <- plot(
-      models$CV_5$EBM_alt$model,
-      interactive = FALSE
-    ) +
-      labs(title = "EBM_alt term importance") +
-      gg_style
-
-    ggsave(file.path(out_dir, "ebm_alt_importance.png"), p_ebm_alt_imp, width = 8, height = 5, dpi = 140)
-  } else {
-    message("EBM_alt model not found in models$CV_5.rds; run IML_CV.R to train it.")
-  }
+    gg_style
+  
+  ggsave(file.path(out_dir, "ebm_alt_term_drivage.png"), p_ebm_alt_drv, width = 8, height = 5, dpi = 140)
+  
+  p_ebm_alt_imp <- plot(
+    models$CV_5$EBM_alt$model,
+    interactive = FALSE
+  ) +
+    labs(title = "EBM_alt term importance") +
+    gg_style
+  
+  ggsave(file.path(out_dir, "ebm_alt_importance.png"), p_ebm_alt_imp, width = 8, height = 5, dpi = 140)
+} else {
+  message("EBM_alt model not found in models$CV_5.rds; run IML_CV.R to train it.")
+}
 
 # XGBoost SHAP via predict(..., predcontrib=TRUE) + shapviz -------------------
 xgb_shap <- predict(
@@ -159,7 +159,7 @@ xgb_shap <- predict(
   predcontrib = TRUE
 )
 
-xgb_shap <- xgb_shap[, colnames(xgb_shap) != "BIAS", drop = FALSE]
+xgb_shap <- xgb_shap[, colnames(xgb_shap) != "(Intercept)", drop = FALSE]
 sv <- shapviz::shapviz(xgb_shap, X = as.data.frame(x_test))
 
 p_xgb <- shapviz::sv_dependence(sv, v = plot_var, color_var = NULL) +

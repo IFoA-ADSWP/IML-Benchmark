@@ -16,7 +16,7 @@ out_dir <- "Results/IML_charts_CV1"
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 set.seed(2026)
-idx_sub <- sample(seq_len(nrow(test_df_full)), size = n_test_subset, replace = FALSE)
+idx_sub <- sample(seq_len(nrow(test_df)), size = n_test_subset, replace = FALSE)
 test_df_charts <- test_df[idx_sub, , drop = FALSE]
 x_test <- dplyr::select(test_df_charts, -ClaimNb)
 
@@ -132,7 +132,7 @@ if (!is.null(models$CV_5$EBM_alt) && !is.null(models$CV_5$EBM_alt$model)) {
     uncertainty = TRUE
   ) +
     labs(
-      title = "EBM_alt term plot - DrivAge",
+      title = "DrivAge - main EBM effect",
       x = "DrivAge",
       y = "Term contribution (link scale)"
     ) +
@@ -140,6 +140,22 @@ if (!is.null(models$CV_5$EBM_alt) && !is.null(models$CV_5$EBM_alt$model)) {
   
   ggsave(file.path(out_dir, "ebm_alt_term_drivage.png"), p_ebm_alt_drv, width = 8, height = 5, dpi = 140)
   
+  p_ebm_alt_drv_2 <- plot(
+    models$CV_5$EBM_alt$model,
+    term = c("VehAge",plot_var)
+    # interactive = FALSE,
+    # uncertainty = TRUE
+  ) +
+    labs(
+      title = "EBM_alt term plot - DrivAge",
+      x = "DrivAge",
+      y = "Term contribution (link scale)"
+    ) +
+    gg_style
+  
+  ggsave(file.path(out_dir, "ebm_alt_term_drivage.png"), p_ebm_alt_drv2, width = 8, height = 5, dpi = 140)
+  
+    
   p_ebm_alt_imp <- plot(
     models$CV_5$EBM_alt$model,
     interactive = FALSE
@@ -159,11 +175,19 @@ xgb_shap <- predict(
   predcontrib = TRUE
 )
 
+mask =TRUE #x_test$Area=="F"
+
 xgb_shap <- xgb_shap[, colnames(xgb_shap) != "(Intercept)", drop = FALSE]
-sv <- shapviz::shapviz(xgb_shap, X = as.data.frame(x_test))
+sv <- shapviz::shapviz(xgb_shap[mask,], X = as.data.frame(x_test[mask,]))
+
+waterfall_xgb = shapviz::sv_waterfall(sv,row_id=2)+
+  labs(title = "SHAP waterfall - obs. ID: 2") +
+  gg_style
+
+ggsave(file.path(out_dir, "waterfall_xgb.png"), waterfall_xgb, width = 8, height = 5, dpi = 140)
 
 p_xgb <- shapviz::sv_dependence(sv, v = plot_var, color_var = NULL) +
-  labs(title = "XGBoost SHAP dependence - DrivAge", x = "DrivAge", y = "SHAP value") +
+  labs(title = "SHAP for XGBoost - DrivAge", x = "DrivAge", y = "SHAP value") +
   gg_style
 
 ggsave(file.path(out_dir, "xgb_shap_drivage.png"), p_xgb, width = 8, height = 5, dpi = 140)

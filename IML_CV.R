@@ -19,7 +19,7 @@ losses = data.frame(CV = paste0("CV_",1:CV),
                     IBLM = NA,
                     XGB = NA,
                     GAM = NA,
-                    EBM = NA,
+                    # EBM = NA,
                     EBM_alt = NA,
                     LocalGLMnet = NA)
 
@@ -44,7 +44,7 @@ for (i in 1:CV){
                                IBLM = NA,
                                XGB = NA,
                                GAM = NA,
-                               EBM = NA,
+                               # EBM = NA,
                                EBM_alt = NA,
                                LocalGLMnet = NA) %>% 
     mutate(homog = mean(dt_list$fre_mtpl2_freq$ClaimNb[train_rows]))
@@ -125,15 +125,15 @@ for (i in 1:CV){
 
   # EBM ------------------------------------------------- 
   
-  info_helper(n=paste0(iter," EBM"))
-
-  models[[iter]]$EBM = train_EBM(train_df[,-1], train_df$ClaimNb)
-
-  ebm_out = predict_EBM(models[[iter]]$EBM$model, test_df[,-1])
-
-  results[[iter]]$EBM = ebm_out$predictions
-
-  losses$EBM[i] = poisson_deviance(y_true = test_df$ClaimNb,y_pred = ebm_out$predictions)
+  # info_helper(n=paste0(iter," EBM"))
+  # 
+  # models[[iter]]$EBM = train_EBM(train_df[,-1], train_df$ClaimNb)
+  # 
+  # ebm_out = predict_EBM(models[[iter]]$EBM$model, test_df[,-1])
+  # 
+  # results[[iter]]$EBM = ebm_out$predictions
+  # 
+  # losses$EBM[i] = poisson_deviance(y_true = test_df$ClaimNb,y_pred = ebm_out$predictions)
 
   # EBM (R ebm package) ---------------------------------------------
 
@@ -217,7 +217,7 @@ poiss_per_CV %>%
   mutate_if(is.numeric,~ if_else(. == homog, .,1 -  ./homog)) %>% 
   select(-homog) %>% 
   mutate_if(is.numeric,scales::percent,0.1) %>% 
-  select(CV,GLM,IBLM,GAM,EBM,EBM_alt,XGB,LocalGLMnet)
+  select(CV,GLM,IBLM,GAM,EBM_alt,XGB,LocalGLMnet)
 
 
 losses %>% 
@@ -267,5 +267,4 @@ multiple_lift(y_true = bind_rows(results,.id = "id") %>% pull(actual),
 analysis %>% 
   slice_sample(prop = 0.25) %>% 
   ggplot(aes(x = actual,y=poiss))+geom_point()+facet_wrap(~name)
-
 
